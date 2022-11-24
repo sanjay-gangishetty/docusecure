@@ -1,7 +1,7 @@
 {
-  "name": "anonshare",
+  "name": "docusecure",
   "version": "1.0.0",
-  "description": "a webapp to share pictures anonymously.",
+  "description": "a webapp to securely store your documents.",
   "main": "app.js",
   "scripts": {
     "start": "node app.js",
@@ -10,19 +10,22 @@
   "author": "Sanjay Kumar",
   "license": "ISC",
   "engines": {
-    "node":"16.17.1"
+    "node": "16.17.1"
   },
   "dependencies": {
-    "bcrypt": "^5.1.0",
     "body-parser": "^1.20.1",
     "dotenv": "^16.0.3",
     "ejs": "^3.1.8",
     "express": "^4.18.2",
+    "express-favicon": "^2.0.1",
     "express-session": "^1.17.3",
     "gridfs-stream": "^1.1.1",
     "method-override": "^3.0.0",
-    "mongoose": "^5.13.15",
+    "mongoose": "^6.7.3",
     "multer": "^1.4.5-lts.1",
-    "multer-gridfs-storage": "^5.0.2"
+    "passport": "^0.6.0",
+    "passport-local": "^1.0.0",
+    "passport-local-mongoose": "^7.1.2",
+    "serve-favicon": "^2.5.0"
   }
 }

@@ -1,195 +1,191 @@
+require("dotenv").config();
 const express = require("express");
 const app = express();
 const ejs = require("ejs");
 const bodyParser = require("body-parser");
 const mongoose = require("mongoose");
-const bcrypt = require("bcrypt");
-const saltRounds = 10;
 const multer = require("multer");
-const path = require("path");
-const crypto = require("crypto");
-const Grid = require("gridfs-stream");
-const methodOverride = require("method-override");
-const {
-  GridFsStorage
-} = require("multer-gridfs-storage");
-const { response } = require("express");
-require("dotenv")
-  .config();
-
+const session = require("express-session");
+const passport = require("passport");
+const passportLocalMongoose = require("passport-local-mongoose");
+const { authenticate } = require("passport");
 
 app.use(bodyParser.json());
-app.use(methodOverride('_method'));
-
-const mongoURI = "mongodb+srv://admin-sanjay:test123@anonshare-cluster.h1lr5ew.mongodb.net/documentsdb";
-const conn = mongoose.createConnection(mongoURI,{useNewUrlParser: true, useUnifiedTopology: true});
-
-let gfs;
-conn.once('open', () => {
-  gfs = Grid(conn.db, mongoose.mongo);
-  gfs.collection('uploads');
-});
-
-const storage = new GridFsStorage({
-  url: mongoURI,
-  file: (req, file) => {
-    return new Promise ((resolve, reject) => {
-      crypto.randomBytes(16, (err, buf) => {
-        if(err){
-          return reject(err);
-        }
-        const filename = buf.toString("hex") + path.extname(file.originalname);
-        const fileInfo = {
-          filename: filename,
-          bucketName: "uploads"
-        };
-        resolve(fileInfo);
-      })
-    })
-  }
-});
-const upload = multer({storage});
-
-const Idandpass = conn.model("Idandpass",mongoose.Schema({
-  userid: String,
-  password: String,
-}));
 
 app.set("view engine", "ejs");
 app.use(bodyParser.urlencoded({ extended: true }));
 
-app.get("/files/:filename", (req,res) => {
-  gfs.files.findOne({filename: req.params.filename}, (err,file) => {
-  if (!file || file.length === 0){
-    return res.status(404).json({
-      err: "no file exists"
-    });
-  }
-  return res.json(file);
-  });
+app.use(
+  session({
+    secret: process.env.SECRET_KEY,
+    resave: false,
+    saveUninitialized: false,
+  })
+);
+
+app.use(passport.initialize());
+app.use(passport.session());
+
+const mongoURI = process.env.MONGO_LINK;
+mongoose.connect(mongoURI);
+
+const IdandpassSchema = new mongoose.Schema({
+  userid: String,
+  password: String,
 });
 
-app.get("/image/:filename", (req,res) => {
-  gfs.files.findOne({filename: req.params.filename}, (err,file) => {
-  if (!file || file.length === 0){
-    return res.status(404).json({
-      err: "no file exists"
-    });
-  }
+const ImageSchema = new mongoose.Schema({
+  pin: Number,
+  image: String,
+});
 
-  if(file.contentType === "image/jpeg" || file.contentType === "image/png"){
-    var readstream = gfs.createReadStream(file.filename);
-    readstream.pipe(res);
+IdandpassSchema.plugin(passportLocalMongoose);
+
+const ImageModel = mongoose.model("imageModel", ImageSchema);
+const Idandpass = new mongoose.model("idandpass", IdandpassSchema);
+
+passport.use(Idandpass.createStrategy());
+passport.serializeUser(Idandpass.serializeUser());
+passport.deserializeUser(Idandpass.deserializeUser());
+
+const storage = multer.diskStorage({
+  destination: "publicImg",
+  filename: (req, file, cb) => {
+    cb(null,file.originalname);
+  },
+});
+
+let upload = multer({
+  storage: storage
+});
+
+app.get("/authenticate", function (req, res) {
+  if(req.isAuthenticated()){
+    res.render("authenticate");
   }else{
-    res.status(404).json({
-      err: "Not an image"
-    });
+    res.redirect("/");
   }
+});
+
+app.post("/authenticate", function (req, res) {
+  const UserPin = req.body.Pin;
+  ImageModel.find({ pin: UserPin }, (err, foundImages) => {
+        if(err){
+          console.log(err);
+        }else{
+          if(foundImages.length === 0){
+            res.send("<h1>Please check your pin and retry.</h1>");
+          }else{
+            res.redirect("/download");
+          }
+        }
   });
 });
 
-app.post('/upload', upload.single('file'), (req, res) => {
-  res.redirect('/home');
+app.get("/download", function (req, res) {
+  if(req.isAuthenticated()){
+    res.render("download");
+  }else{
+    res.redirect("/");
+  }
 });
+
+app.post("/download", function(req,res){
+ const UserReq = req.body.downloadReq;
+ const file = __dirname+"/publicImg/"+UserReq;
+ ImageModel.find({image: UserReq},(err,foundImages) => {
+  if(foundImages.length === 0){
+    res.send(err);
+  }else{
+ res.download(file);
+  }
+ })
+})
 
 app.get("/", function (req, res) {
   res.render("main.ejs");
 });
 
-app.delete("/files/:id", (req, res) => {
-  gfs.remove({ _id: req.params.id, root: "uploads" }, (err, gridStore) => {
-    if (err) {
-      return res.status(404).json({ err: err });
-    }
-    res.redirect("/home");
-  });
-});
-
-app.get("/upload",function(req,res){
-  res.render("upload");
-  res.send("Successfully uploaded the image");
-  res.redirect("/");
-})
-
 app.get("/home", function (req, res) {
-  gfs.files.find().toArray((err, files) => {
-    if (!files || files.length === 0) {
-      res.render('home', { files: false });
-    } else {
-      files.map(file => {
-        if (
-          file.contentType === 'image/jpeg' ||
-          file.contentType === 'image/png'
-        ) {
-          file.isImage = true;
-        } else {
-          file.isImage = false;
-        }
-      });
-      res.render('home', { files: files });
+  if (req.isAuthenticated()) {
+    res.render("home");
+  } else {
+    res.redirect("/");
+  }
+});
+
+app.get("/upload", function (req, res) {
+  if (req.isAuthenticated()) {
+    res.render("upload");
+  } else {
+    res.redirect("/");
+  }
+});
+
+app.post("/upload", upload.single("file"), function (req, res) {
+  ImageModel.create(
+    { image: req.file.filename, pin: req.body.pin },
+    function (err) {
+      if (err) {
+        console.log(err);
+      } else {
+        res.redirect("/upload");
+      }
     }
-  });   
+  );
 });
 
-app.post("/home",  upload.single("file"), (req, res) => {
-  res.redirect("/home");
+app.get("/register", function (req, res) {
+  res.render("register.ejs");
 });
 
-app.get("/signup", function (req, res) {
-  res.render("signup.ejs");
-});
+app.post("/register", function (req, res) {
+  const username = req.body.username;
+  const p1 = req.body.password;
+  const p2 = req.body.confirmPassword;
 
-app.post("/signup", function (req, res) {
-  username = req.body.username;
-    p1 = req.body.password;
-    p2 = req.body.confirmPassword;
-  bcrypt.hash(p1, saltRounds, function(err, hash){
-    const newUser = new Idandpass({
-      userid: username,
-      password: hash
-    });
-    if (p1 === p2) {
-      newUser.save((err) => {
-        if(err){
-          console.log(err);
-        }else{
-          res.redirect("/home");
-        }
-      });
+  Idandpass.register({ username: username }, p1, function (err, user) {
+    if (err) {
+      console.log(err);
+      res.redirect("/register");
     } else {
-      res.send("The password and confirm password fields must match.");
+      passport.authenticate("local")(req, res, function () {
+        res.redirect("/home");
+      });
     }
-  }) 
+  });
 });
 
 app.get("/login", function (req, res) {
   res.render("login.ejs");
 });
 
-app.get("/logout", function(req,res){
-  res.redirect("/");
-})
+app.post("/login", function (req, res) {
+  const loginId = req.body.username;
+  const loginPassword = req.body.password;
 
-app.post("/login", function(req, res) { 
-  loginId = req.body.username;
-  loginPassword = req.body.password;
-  Idandpass.findOne({ userid: loginId }, function(err, foundUser) {
-     if(err){
-      console.log(err);
-     }else{
-      if(foundUser){
-        bcrypt.compare(loginPassword, foundUser.password, function(err, result){
-          if(result === true){
-            res.redirect("/home");
-          }
-        })
-      }
-     }  
+  const user = new Idandpass({
+    username: loginId,
+    password: loginPassword,
+  });
+
+  req.login(user, function (err) {
+    if (err) {
+     console.log(err);
+    } else {
+      passport.authenticate("local")(req, res, function () {
+        res.redirect("/home");
+      });
+    }
   });
 });
 
+app.get("/logout", function (req, res) {
+  res.redirect("/");
+});
+
 let port = process.env.PORT;
-if(port == null || port == ""){
+if (port == null || port == "") {
   port = 3000;
 }
 

@@ -1,29 +1,15 @@
 <%- include("header.ejs") %>
+<link rel="shortcut icon" href="./favicon.ico" type="image/x-icon">
 
-<div class="container">
+<div class="container text-center">
     <div class="row">
-       <div class="col-md-6 m-auto text-center">
-       <h1 class="display-4 my-4">AnonShare</h1>
-        <p>Share pictures being Anonymous.</p>
+       <div class="col-md-6 m-auto">
+       <h1 class="display-4 my-4">DocuSecure</h1>
+        <p>One stop solution to save your Documents.</p>
         <a class="btn btn-primary btn-block" href="/upload" role="button">Upload</a>
         <a class="btn btn-danger btn-block" href="/logout" role="button">Logout</a>
+        <a class="btn btn-success btn-block" href="/authenticate" role="button">Download</a>
         <hr> 
-        <% if(files){ %>
-          <% files.forEach(function(file) { %>
-            <div class="card card-body mb-3">
-              <% if(file.isImage) { %>
-                <img src="image/<%= file.filename %>" class="images"alt="">
-                <% } else { %>
-                  <%= file.filename %>
-                    <% } %>
-                      <!-- <form method="POST" action="/files/<%= file._id %>?_method=DELETE">
-                         <button class="btn btn-danger btn-block mt-4">Delete</button> 
-                      </form>         -->
-            </div>
-            <% }) %>
-              <% } else { %>
-                <p>No images to show</p>
-                <% } %>
       </div>
     </div>
   </div>
