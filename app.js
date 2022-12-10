@@ -26,6 +26,7 @@ app.use(
 app.use(passport.initialize());
 app.use(passport.session());
 
+mongoose.set('strictQuery', true);
 const mongoURI = process.env.MONGO_LINK;
 mongoose.connect(mongoURI);
 
@@ -184,7 +185,7 @@ app.get("/logout", function (req, res) {
   res.redirect("/");
 });
 
-let port = process.env.PORT || 3000;
+const port = process.env.PORT || 3000;
 
 app.listen(port, function () {
   console.log("Server has started Successfully.");
