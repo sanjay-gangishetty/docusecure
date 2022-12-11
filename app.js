@@ -22,7 +22,7 @@ app.use(
     saveUninitialized: false,
   })
 );
-// "mongoose": "^6.8.0",
+
 app.use(passport.initialize());
 app.use(passport.session());
 
